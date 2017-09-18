@@ -60,6 +60,7 @@ fn main() {
     start_server(address, database).unwrap();
 }
 
+#[allow(resolve_trait_on_defaulted_unit)]
 fn start_server<D>(address: &str, database: D) -> Result<ListeningServer, Box<StdError>>
 where D: Database {
     let server_data = ServerData {

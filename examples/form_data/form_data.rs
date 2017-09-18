@@ -1,3 +1,4 @@
+#![allow(resolve_trait_on_defaulted_unit)]
 #[macro_use] extern crate nickel;
 use nickel::{Nickel, HttpRouter, FormBody};
 use std::collections::HashMap;

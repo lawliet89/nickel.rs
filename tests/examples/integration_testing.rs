@@ -2,4 +2,5 @@
 
 #![allow(dead_code)]
 #![allow(unused_attributes)]
+#![allow(resolve_trait_on_defaulted_unit)]
 include!("../../examples/integration_testing.rs");

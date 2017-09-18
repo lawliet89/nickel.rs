@@ -1,4 +1,5 @@
-#![doc(test(attr(deny(warnings))))]
+#![doc(test(attr(allow(resolve_trait_on_defaulted_unit))))]
+#![allow(resolve_trait_on_defaulted_unit)]
 
 extern crate time;
 extern crate rustc_serialize as serialize;
