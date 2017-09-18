@@ -1,9 +1,13 @@
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::io::ErrorKind::NotFound;
 use std::fs;
+use std::str::Utf8Error;
 
 use hyper::method::Method::{Get, Head};
+use percent_encoding;
 
+use NickelError;
 use status::StatusCode;
 use request::Request;
 use response::Response;
@@ -20,7 +24,18 @@ impl<D> Middleware<D> for StaticFilesHandler {
     fn invoke<'a>(&self, req: &mut Request<D>, res: Response<'a, D>)
             -> MiddlewareResult<'a, D> {
         match req.origin.method {
-            Get | Head => self.with_file(self.extract_path(req), res),
+            Get | Head => {
+                match self.extract_path(req) {
+                    Some(path) => {
+                        let path = Self::percent_decode(path);
+                        match path {
+                            Ok(path) => self.with_file(Path::new(path.as_ref()), res),
+                            Err(e) => Err(NickelError::new(res, e.to_string(), StatusCode::BadRequest))
+                        }
+                    }
+                    None => res.next_middleware()
+                }
+            },
             _ => res.next_middleware()
         }
     }
@@ -56,28 +71,29 @@ impl StaticFilesHandler {
         })
     }
 
+    fn percent_decode<'a>(path: &'a str) -> Result<Cow<'a, str>, Utf8Error> {
+        percent_encoding::percent_decode(path.as_bytes()).decode_utf8()
+    }
+
     fn with_file<'a, 'b, D, P>(&self,
-                            relative_path: Option<P>,
+                            path: P,
                             res: Response<'a, D>)
             -> MiddlewareResult<'a, D> where P: AsRef<Path> {
-        if let Some(path) = relative_path {
-            let path = path.as_ref();
-            if !safe_path(path) {
-                let log_msg = format!("The path '{:?}' was denied access.", path);
-                return res.error(StatusCode::BadRequest, log_msg);
-            }
+        let path = path.as_ref();
+        if !safe_path(path) {
+            let log_msg = format!("The path '{:?}' was denied access.", path);
+            return res.error(StatusCode::BadRequest, log_msg);
+        }
 
-            let path = self.root_path.join(path);
-            match fs::metadata(&path) {
-                Ok(ref attr) if attr.is_file() => return res.send_file(&path),
-                Err(ref e) if e.kind() != NotFound => debug!("Error getting metadata \
-                                                              for file '{:?}': {:?}",
-                                                              path, e),
-                _ => {}
+        let path = self.root_path.join(path);
+        match fs::metadata(&path) {
+            Ok(ref attr) if attr.is_file() => res.send_file(&path),
+            Err(ref e) if e.kind() != NotFound => {
+                debug!("Error getting metadata for file '{:?}': {:?}", path, e);
+                res.next_middleware()
             }
-        };
-
-        res.next_middleware()
+            _ => res.next_middleware()
+        }
     }
 }
 

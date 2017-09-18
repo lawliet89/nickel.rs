@@ -56,3 +56,10 @@ fn fallthroughs_with_same_prefix() {
         assert_eq!(s, "Not Found");
     });
 }
+
+#[test]
+fn percent_decode_path() {
+    with_path("/nested/file%20with%20space.js", |res| {
+        assert_eq!(res.status, StatusCode::Ok);
+    });
+}
